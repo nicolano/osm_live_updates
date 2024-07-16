@@ -13,16 +13,14 @@ class SparqlConnector:
 
     def delete_subject(self, subject: str) -> None:
         """
-        Creates and executes a sparql query that deletes all triplets containing given subject as well as the osm2rdf
-        geometry object.
-        :param subject: The subject to delete
+        Creates and executes a sparql query that deletes all triplets containing the given subject
+        :param subject: The subject for which the triplets are to be deleted
         """
         self.sparql.setQuery(
 f"""
 {PREFIXES}
 DELETE {{ ?s ?p ?o }} WHERE {{
-    ?s ?p ?o .
-    FILTER (?s = {subject} || ?s = {self.__formate_subject_for_osm2rdfgeom(subject)} )
+    {subject} ?p ?o .
 }}
 """
         )
@@ -44,36 +42,3 @@ INSERT DATA {{
         )
         print(self.sparql.queryString)
         # self.sparql.query()
-
-    def modify_subject(self, subject: str, new_triplets: str) -> None:
-        """
-        Delete all triplets for the given subject and insert the new triplets.
-        :param subject: The subject to modify
-        :param new_triplets: The new triples to insert
-        """
-        self.delete_subject(subject)
-        self.insert_triples(new_triplets)
-
-    @staticmethod
-    def __formate_subject_for_osm2rdfgeom(subject: str) -> str:
-        """
-        Formats the subject name for the 'osm2rdfgeom' property, for example:
-        Subject 'osmnode:1642992563' is formatted to: 'osm_node_1642992563'
-        Subject 'osmway:7738035' is formatted to: 'osm2rdf:way_7738035'
-        Subject 'osmrel:2727671' is formatted to: 'osm2rdf:rel_2727671'
-
-        :param subject:
-        :return:
-        """
-        formatted_subject: str
-        if 'node' in subject:
-            subject.replace(":", "_").replace("osm", "osm_")
-            formatted_subject = f"osm2rdfgeom:{subject}"
-        elif 'way' in subject:
-            subject.replace("osmway:", "way_")
-            formatted_subject = f"osm2rdf:{subject}"
-        else:
-            subject.replace("osmrel:", "rel_")
-            formatted_subject = f"osm2rdf:{subject}"
-
-        return formatted_subject
