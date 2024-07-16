@@ -1,6 +1,7 @@
 OSM_REPLICATION_BASE_URL = "https://planet.openstreetmap.org/replication"
 CHANGE_FILE_EXTENSION = "osc.gz"
 STATE_FILE_EXTENSION = "state.txt"
+TEMPORARY_TAG = "TEMPORARY"
 
 # Osm2RdfConnector
 OSM_2_RDF_INPUT_FILE_NAME = "tmp.osm"
