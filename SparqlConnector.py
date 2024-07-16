@@ -24,8 +24,8 @@ DELETE {{ ?s ?p ?o }} WHERE {{
 }}
 """
         )
-        print(self.sparql.queryString)
-        # self.sparql.query()
+        self.sparql.queryType = "INSERT"
+        self.sparql.query()
 
     def insert_triples(self, triples: str) -> None:
         """
@@ -40,5 +40,5 @@ INSERT DATA {{
 }}
 """
         )
-        print(self.sparql.queryString)
-        # self.sparql.query()
+        self.sparql.queryType = "DELETE"
+        self.sparql.query()
