@@ -9,7 +9,7 @@ class Osm2RdfConnector:
     osm2rdf_path: str
     image_name: str
 
-    def __init__(self, osm2rdf_path: str, image_name: str):
+    def __init__(self, osm2rdf_path: str, image_name: str) -> None:
         """
         Connection layer for the osm2rdf tool, that is used to convert osm data to RDF Turtle.
         (see https://github.com/ad-freiburg/osm2rdf)
@@ -21,14 +21,22 @@ class Osm2RdfConnector:
         self.osm2rdf_path = osm2rdf_path
         self.image_name = image_name
 
-    def __write_to_input_file(self, data: bytes):
+    def __write_input_to_file(self, data: bytes) -> None:
+        """
+        Packs the passed data in a xml element and writes it to the input file in the osm2rdf tool's 'input' folder
+        :param data: Data to be written to the input file.
+        """
         logging.debug("Writing osm data to input file")
         with open(self.osm2rdf_path + f"/input/{OSM_2_RDF_INPUT_FILE_NAME}", 'w') as file:
-            content = f'<osmChange version="0.6" generator="osmdbt-create-diff/0.6">\n{data.decode()}</osmChange>'
+            content = f'<osmChange version="0.6" generator="osmdbt-create-diff/0.6">\n{data.decode()}\n</osmChange>'
             file.write(content)
             file.close()
 
-    def __read_from_output_file(self) -> str:
+    def __read_output_from_file(self) -> str:
+        """
+        Reads the content of the osm2rdf tools 'output' folder and returns it as a string.
+        :return: The content of the 'output' folder.
+        """
         logging.debug("Reading rdf data from output file")
         with bz2_open(self.osm2rdf_path + f"/output/{OSM_2_RDF_OUTPUT_FILE_NAME}") as file:
             return file.read().decode()
@@ -39,20 +47,29 @@ class Osm2RdfConnector:
         :param osm_data: The osm data to convert
         :return: The generated tuples in RDF Turtle format
         """
-        self.__write_to_input_file(osm_data)
+        self.__write_input_to_file(osm_data)
         self.__run()
-        return self.__remove_headers(self.__read_from_output_file())
+
+        output = self.__remove_headers(self.__read_output_from_file())
+        if output == "":
+            logging.warning(f"No output generated for input: {osm_data}")
+
+        return output
 
     @staticmethod
     def __remove_headers(string: str) -> str:
         """
-        Removes all lines from the passed string that start with a '@'.
+        Removes all lines from the given string that begin with an '@', matching the headers that begin with
+        '@prefix'
         """
         lines = string.split('\n')
         filtered_lines = [line for line in lines if not line.startswith('@')]
         return '\n'.join(filtered_lines)
 
-    def __run(self):
+    def __run(self) -> None:
+        """
+        Runs the docker command to execute the osm2rdf tool.
+        """
         logging.debug("Start Conversion")
         args = shlex_split(f'docker run --rm '
                            f'-v {self.osm2rdf_path}/input/:/input/ '
