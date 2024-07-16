@@ -34,63 +34,69 @@ class OsmLiveUpdates:
                 child: ElementTree.Element
                 for child in root:
                     if child.tag == 'delete':
-                        self.__handle_delete(child)
+                        for element in child:
+                            self.__handle_delete(element)
                     elif child.tag == 'insert':
-                        self.__handle_insert(child)
+                        for element in child:
+                            self.__handle_insert(element)
                     elif child.tag == 'modify':
-                        self.__handle_modify(child)
+                        for element in child:
+                            self.__handle_modify(element)
             else:
                 logging.error(f"State for Sequence number {str(sequence_number)} does not exist")
 
             # sequence_number += 1
 
-    def __handle_delete(self, to_delete: ElementTree.Element) -> None:
+    def __handle_delete(self, element: ElementTree.Element) -> None:
         """
-        Handles all elements that are marked to delete.
-        :param to_delete: Elements to delete.
+        Handles element that is marked as to delete.
+        :param element: Element to delete.
         """
-        for element in to_delete:
-            identifier = element.attrib['id']
-            element_name = self.__get_element_name(element)
+        identifier = element.attrib['id']
+        element_name = self.__get_element_name(element)
 
-            # Delete all triplets containing the subject
-            subject = f"osm{element_name}:{identifier}"
-            self.sparqlConnector.delete_subject(subject)
+        # Delete all triplets containing the subject
+        subject = f"osm{element_name}:{identifier}"
+        self.sparqlConnector.delete_subject(subject)
 
-            # Delete the triplet that contains the osm2rdf geo object
-            formatted_subject = self.__formate_subject_for_osm2rdfgeom(subject)
-            self.sparqlConnector.delete_subject(formatted_subject)
+        # Delete the triplet that contains the osm2rdf geo object
+        formatted_subject = self.__formate_subject_for_osm2rdfgeom(subject)
+        self.sparqlConnector.delete_subject(formatted_subject)
 
-    def __handle_insert(self, to_insert: ElementTree.Element):
+    def __handle_insert(self, element: ElementTree.Element):
         """
-        Handles all elements that are marked to insert.
-        :param to_insert: Elements to insert.
+        Handles element that is marked to be inserted.
+        :param element: Element to insert.
         """
-        for element in to_insert:
-            # Add a tag temporary tag to the element, otherwise osm2rdf will ignore the element.
-            element_needs_temporary_tag: bool = len(element.getchildren()) == 0
-            if element_needs_temporary_tag:
-                self.__add_temporary_tag(element)
+        # Add a tag temporary tag to the element, otherwise osm2rdf will ignore the element.
+        print(ElementTree.tostring(element))
+        element_needs_temporary_tag: bool
+        try:
+            element_needs_temporary_tag = len(element.getchildren()) == 0
+        except AttributeError:
+            element_needs_temporary_tag = True
 
-            # Convert the osm data to the rdf format
-            element_string = ElementTree.tostring(element).rstrip()
-            rdf_triples = self.osm2rdfConnector.convert(element_string)
+        if element_needs_temporary_tag:
+            self.__add_temporary_tag(element)
 
-            if element_needs_temporary_tag:
-                self.__remove_triplets_for_temporary_tag(rdf_triples)
+        # Convert the osm data to the rdf format
+        element_string = ElementTree.tostring(element).rstrip()
+        rdf_triples = self.osm2rdfConnector.convert(element_string)
 
-            # Insert the triplets to the database
-            self.sparqlConnector.insert_triples(rdf_triples)
+        if element_needs_temporary_tag:
+            rdf_triples = self.__remove_triplets_for_temporary_tag(rdf_triples)
 
-    def __handle_modify(self, to_modify: ElementTree.Element):
+    # Insert the triplets to the database
+        self.sparqlConnector.insert_triples(rdf_triples)
+
+    def __handle_modify(self, element: ElementTree.Element):
         """
-        Handles all elements that are marked to be modified, which means deleting the old triplets and inserting the
-        new triplets ones.
-        :param to_modify: Elements to be modified.
+        Handles all element that is marked to be modified, which means deleting the old triplets and inserting the
+        new ones.
+        :param element: Element to be modified.
         """
-        for element in to_modify:
-            self.__handle_delete(element)
-            self.__handle_insert(element)
+        self.__handle_delete(element)
+        self.__handle_insert(element)
 
     @staticmethod
     def __add_temporary_tag(element: ElementTree.Element) -> None:
