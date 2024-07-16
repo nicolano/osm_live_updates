@@ -69,7 +69,6 @@ class OsmLiveUpdates:
         :param element: Element to insert.
         """
         # Add a tag temporary tag to the element, otherwise osm2rdf will ignore the element.
-        print(ElementTree.tostring(element))
         element_needs_temporary_tag: bool
         try:
             element_needs_temporary_tag = len(element.getchildren()) == 0
@@ -233,7 +232,7 @@ class OsmLiveUpdates:
 
 def main() -> None:
     logging.getLogger().setLevel(logging.DEBUG)
-    sparql_endpoint = "http://Nicolass-MBP.fritz.box:7200/repositories/osm-test"
+    sparql_endpoint = "http://Nicolass-MBP.fritz.box:7200/repositories/osm-test/statements"
 
     olu = OsmLiveUpdates("/Users/nicolasvontrott/Documents/Masterproject/osm2rdf/osm2rdf", "nicolano/osm2rdf", sparql_endpoint)
     olu.fetch_change(6176377)
