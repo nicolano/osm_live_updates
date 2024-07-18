@@ -140,7 +140,7 @@ class OsmLiveUpdates:
         formatted_subject = self.__formate_subject_for_osm2rdfgeom(subject)
         self.sparqlConnector.delete_subject(formatted_subject)
 
-        logging.info(f"Handled delete for {element.tag}")
+        logging.info(f"Processed delete for {element.tag} with id {element.attrib['id']}")
 
     def __handle_insert(self, element: ElementTree.Element):
         """
@@ -172,7 +172,7 @@ class OsmLiveUpdates:
 
         # Insert the triplets to the database
         self.sparqlConnector.insert_triples(rdf_triples)
-        logging.info(f"Handled insert for {element.tag}")
+        logging.info(f"Processed insert for {element.tag} with id {element.attrib['id']}")
 
     def __handle_modify(self, element: ElementTree.Element):
         """
@@ -180,6 +180,7 @@ class OsmLiveUpdates:
         new ones.
         :param element: Element to be modified.
         """
+        logging.info(f"Process modify for {element.tag} with id {element.attrib['id']}")
         self.__handle_delete(element)
         self.__handle_insert(element)
 
@@ -213,10 +214,9 @@ class OsmLiveUpdates:
         logging.debug(f"Fetching data for sequence number {str(sequence_number)}")
         sequence_number_formatted = self.__format_sequence_number_for_url(sequence_number)
         url = f"{OSM_REPLICATION_BASE_URL}/minute/{sequence_number_formatted}.{CHANGE_FILE_EXTENSION}"
-        with urlopen(url) as f:
-            f: HTTPResponse = f
-            with gzip.GzipFile(fileobj=io.BytesIO(f.read())) as decompressed:
-                return decompressed.read()
+        response: bytes = self.__open_url(url)
+        with gzip.GzipFile(fileobj=io.BytesIO(response)) as decompressed:
+            return decompressed.read()
 
     def __state_exists_for_sequence_number(self, sequence_number: int) -> bool:
         """
@@ -228,12 +228,12 @@ class OsmLiveUpdates:
         logging.debug(f"Check if state exists for sequence number: {str(sequence_number)}")
         sequence_number_formatted = self.__format_sequence_number_for_url(sequence_number)
         url = f"{OSM_REPLICATION_BASE_URL}/minute/{sequence_number_formatted}.{STATE_FILE_EXTENSION}"
-        try:
-            with urlopen(url) as f:
-                sequence_number_fetched = self.__get_sequence_number_from_state_file(f.read().decode("utf-8"))
-        except:
+
+        response: bytes = self.__open_url(url)
+        if response == b'':
             return False
 
+        sequence_number_fetched = self.__get_sequence_number_from_state_file(response.decode())
         return sequence_number_fetched == sequence_number
 
     @staticmethod
@@ -254,9 +254,8 @@ class OsmLiveUpdates:
         :return: The sequence number of the latest diff
         """
         url = f"{OSM_REPLICATION_BASE_URL}/minute/state.txt"
-        with urlopen(url) as f:
-            # Define the regex pattern to match the sequenceNumber
-            return self.__get_sequence_number_from_state_file(f.read().decode("utf-8"))
+        response: bytes = self.__open_url(url)
+        return self.__get_sequence_number_from_state_file(response.decode())
 
     @staticmethod
     def __format_sequence_number_for_url(sequence_number: int) -> str:
@@ -318,7 +317,7 @@ class OsmLiveUpdates:
 
 
 def main() -> None:
-    logging.getLogger().setLevel(logging.DEBUG)
+    logging.getLogger().setLevel(logging.INFO)
     sparql_endpoint = "http://Nicolass-MBP.fritz.box:7200/repositories/osm-test/statements"
     osm2rdf_path = "/Users/nicolasvontrott/Documents/Masterproject/osm2rdf/osm2rdf"
     osm2rdf_image_name = "nicolano/osm2rdf"
