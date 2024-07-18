@@ -1,14 +1,16 @@
 import logging
 from http.client import HTTPResponse
+from urllib.error import HTTPError
 from urllib.request import urlopen
 import gzip
 import io
 import re
 from xml.etree import ElementTree
+import time
 
 from Osm2RdfConnector import Osm2RdfConnector
 from SparqlConnector import SparqlConnector
-from Constants import OSM_REPLICATION_BASE_URL, STATE_FILE_EXTENSION, CHANGE_FILE_EXTENSION, TEMPORARY_TAG
+from Constants import OSM_REPLICATION_BASE_URL, STATE_FILE_EXTENSION, CHANGE_FILE_EXTENSION, TEMPORARY_TAG, OSM_NODE_URL
 
 
 class OsmLiveUpdates:
@@ -22,11 +24,16 @@ class OsmLiveUpdates:
     def fetch_change(self, from_sequence_number: int):
         logging.info(f"Starting fetch from sequence number {str(from_sequence_number)}")
 
-        latest_sequence_number = self.__fetch_latest_sequence_number()
-        logging.info(f"Latest sequence number is {str(latest_sequence_number)} so there are {str(latest_sequence_number - from_sequence_number)} diffs to fetch")
+        latest_sequence_number: int = self.__fetch_latest_sequence_number()
+        logging.info(f""
+                     f"Latest sequence number is {str(latest_sequence_number)} so there are "
+                     f"{str(latest_sequence_number - from_sequence_number)} diffs to fetch"
+                     )
 
-        sequence_number = from_sequence_number + 1
+        sequence_number: int = from_sequence_number + 1
         while sequence_number <= latest_sequence_number:
+            counter = 0
+            start_time = time.time()
             if self.__state_exists_for_sequence_number(sequence_number):
                 data: bytes = self.__fetch_diff_for_sequence_number(sequence_number)
                 root: ElementTree = ElementTree.fromstring(data)
@@ -36,16 +43,86 @@ class OsmLiveUpdates:
                     if child.tag == 'delete':
                         for element in child:
                             self.__handle_delete(element)
+                            counter += 1
                     elif child.tag == 'insert':
                         for element in child:
                             self.__handle_insert(element)
+                            counter += 1
                     elif child.tag == 'modify':
                         for element in child:
                             self.__handle_modify(element)
+                            counter += 1
             else:
                 logging.error(f"State for Sequence number {str(sequence_number)} does not exist")
 
+            print("--- %s seconds ---" % (time.time() - start_time))
+            logging.info(f"{counter} changes where processed for diff {sequence_number}")
+            break
             # sequence_number += 1
+
+    @staticmethod
+    def __open_url(url) -> bytes:
+        """
+        Tries to open an url and return the response as a byte object. Returns an empty byte object if the an exception
+        occurred while trying to open the url.
+        :param url: The url to open.
+        :return: The response as a byte object.
+        """
+        try:
+            with urlopen(url) as response:
+                return response.read()
+        except HTTPError as e:
+            if e.code == 410:
+                logging.error(f"HTTPError while opening URL \"{e.url}\" because the resource is not available "
+                              f"anymore (410)")
+            else:
+                logging.error(f"HTTPError while opening URL \"{e.url}\" with error code {e.code}")
+            return b''
+
+    def __fetch_node_references_for_way(self, element: ElementTree) -> bytes:
+        """
+        Fetches the node references for a way. The nodes defining the geometry of a way are  indicated only by reference
+        using their unique identifier. Therefore, the node references have to be fetched so that osm2rdf can calculate
+        the correct geometry for each way.
+        :param element: The 'way' element, to fetch the node references for
+        :return: A bytes object containing the node references for a way
+        """
+        nodes: bytes = b''
+        visited_nodes: set[str] = set()
+
+        for child in element:
+            if child.tag == "nd":
+                node_id = child.attrib["ref"]
+
+                # Do not get the node reference for an already visited node. This is helpful because a way can contain a
+                # node reference multiple times (for example if the way is a circle.)
+                if node_id not in visited_nodes:
+                    visited_nodes.add(node_id)
+
+                    # Fetch the node element
+                    url = f"{OSM_NODE_URL}/{node_id}"
+                    response = self.__open_url(url)
+
+                    # Get the node text from the returned xml element
+                    if response != b'':
+                        element: ElementTree = ElementTree.fromstring(response.decode())
+                        nodes += self.__get_node_text_from_xml_element(element)
+
+        return nodes
+
+    @staticmethod
+    def __get_node_text_from_xml_element(element: ElementTree) -> bytes:
+        """
+        Extracts the node element from an XML element.
+        :param element: An XML element containing a node element
+        :return: A bytes object containing the nodes elements text
+        """
+        for child in element:
+            if child.tag == "node":
+                return ElementTree.tostring(child)
+
+        logging.warning(f"No node could be found in xml element {ElementTree.tostring(element)}")
+        return b''
 
     def __handle_delete(self, element: ElementTree.Element) -> None:
         """
@@ -63,6 +140,8 @@ class OsmLiveUpdates:
         formatted_subject = self.__formate_subject_for_osm2rdfgeom(subject)
         self.sparqlConnector.delete_subject(formatted_subject)
 
+        logging.info(f"Handled delete for {element.tag}")
+
     def __handle_insert(self, element: ElementTree.Element):
         """
         Handles element that is marked to be inserted.
@@ -78,15 +157,22 @@ class OsmLiveUpdates:
         if element_needs_temporary_tag:
             self.__add_temporary_tag(element)
 
+        element_string: bytes = b''
+        # Fetch node references for ways
+        if element.tag == "way":
+            node_refs = self.__fetch_node_references_for_way(element)
+            element_string = node_refs
+
         # Convert the osm data to the rdf format
-        element_string = ElementTree.tostring(element).rstrip()
+        element_string += ElementTree.tostring(element).rstrip()
         rdf_triples = self.osm2rdfConnector.convert(element_string)
 
         if element_needs_temporary_tag:
             rdf_triples = self.__remove_triplets_for_temporary_tag(rdf_triples)
 
-    # Insert the triplets to the database
+        # Insert the triplets to the database
         self.sparqlConnector.insert_triples(rdf_triples)
+        logging.info(f"Handled insert for {element.tag}")
 
     def __handle_modify(self, element: ElementTree.Element):
         """
@@ -230,15 +316,18 @@ class OsmLiveUpdates:
 
         return element_name
 
+
 def main() -> None:
     logging.getLogger().setLevel(logging.DEBUG)
     sparql_endpoint = "http://Nicolass-MBP.fritz.box:7200/repositories/osm-test/statements"
+    osm2rdf_path = "/Users/nicolasvontrott/Documents/Masterproject/osm2rdf/osm2rdf"
+    osm2rdf_image_name = "nicolano/osm2rdf"
 
-    olu = OsmLiveUpdates("/Users/nicolasvontrott/Documents/Masterproject/osm2rdf/osm2rdf", "nicolano/osm2rdf", sparql_endpoint)
-    olu.fetch_change(6176377)
+    olu = OsmLiveUpdates(osm2rdf_path, osm2rdf_image_name, sparql_endpoint)
+    olu.fetch_change(6180233)
 
     # o2c = Osm2RdfConnector("/Users/nicolasvontrott/Documents/Masterproject/osm2rdf/osm2rdf")
-    # o2c.convert("".encode())
+    # o2c.convert(b'')
 
     # sc = SparqlConnector(sparql_endpoint)
     # sc.delete_subject("athlete:JosephJosyStoffel")
