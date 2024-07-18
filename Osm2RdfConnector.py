@@ -3,6 +3,7 @@ from subprocess import Popen
 from Constants import OSM_2_RDF_INPUT_FILE_NAME, OSM_2_RDF_OUTPUT_FILE_NAME
 from shlex import split as shlex_split
 from bz2 import open as bz2_open
+from subprocess import DEVNULL, STDOUT
 
 
 class Osm2RdfConnector:
@@ -79,7 +80,7 @@ class Osm2RdfConnector:
                            f'/input/{OSM_2_RDF_INPUT_FILE_NAME} '
                            f'-o /output/{OSM_2_RDF_OUTPUT_FILE_NAME} '
                            f'-t /scratch/')
-        p = Popen(args, cwd=self.osm2rdf_path)
+        p = Popen(args, cwd=self.osm2rdf_path, stdout=DEVNULL, stderr=STDOUT)
         result = p.wait()
         if result != 0:
             raise Exception(f'Failed to convert to RDF')
