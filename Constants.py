@@ -1,4 +1,5 @@
 OSM_REPLICATION_BASE_URL = "https://planet.openstreetmap.org/replication"
+OSM_NODE_URL = "https://www.openstreetmap.org/api/0.6/node"
 CHANGE_FILE_EXTENSION = "osc.gz"
 STATE_FILE_EXTENSION = "state.txt"
 TEMPORARY_TAG = "TEMPORARY"
