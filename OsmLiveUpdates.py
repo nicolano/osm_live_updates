@@ -1,5 +1,4 @@
 import logging
-from http.client import HTTPResponse
 from urllib.error import HTTPError
 from urllib.request import urlopen
 import gzip
@@ -24,7 +23,7 @@ class OsmLiveUpdates:
     def fetch_change(self, from_sequence_number: int):
         logging.info(f"Starting fetch from sequence number {str(from_sequence_number)}")
 
-        latest_sequence_number: int = self.__fetch_latest_sequence_number()
+        latest_sequence_number: int = self.fetch_latest_sequence_number()
         logging.info(f""
                      f"Latest sequence number is {str(latest_sequence_number)} so there are "
                      f"{str(latest_sequence_number - from_sequence_number)} diffs to fetch"
@@ -35,7 +34,7 @@ class OsmLiveUpdates:
             counter = 0
             start_time = time.time()
             if self.__state_exists_for_sequence_number(sequence_number):
-                data: bytes = self.__fetch_diff_for_sequence_number(sequence_number)
+                data: bytes = self.fetch_diff_for_sequence_number(sequence_number)
                 root: ElementTree = ElementTree.fromstring(data)
 
                 child: ElementTree.Element
@@ -44,7 +43,7 @@ class OsmLiveUpdates:
                         for element in child:
                             self.__handle_delete(element)
                             counter += 1
-                    elif child.tag == 'insert':
+                    elif child.tag == 'create':
                         for element in child:
                             self.__handle_insert(element)
                             counter += 1
@@ -205,7 +204,7 @@ class OsmLiveUpdates:
         """
         return re.sub(f".*{TEMPORARY_TAG}.*\n?","", triplets)
 
-    def __fetch_diff_for_sequence_number(self, sequence_number: int) -> bytes:
+    def fetch_diff_for_sequence_number(self, sequence_number: int) -> bytes:
         """
         Fetches the diff file for the given sequence number from the osm server and decompresses it.
         :param sequence_number: The sequence number of the diff to fetch
@@ -248,7 +247,7 @@ class OsmLiveUpdates:
         match = re.search(pattern, file)
         return int(match.group(1))
 
-    def __fetch_latest_sequence_number(self) -> int:
+    def fetch_latest_sequence_number(self) -> int:
         """
         Fetches the sequence number of the latest diff from the osm server.
         :return: The sequence number of the latest diff
@@ -323,7 +322,7 @@ def main() -> None:
     osm2rdf_image_name = "nicolano/osm2rdf"
 
     olu = OsmLiveUpdates(osm2rdf_path, osm2rdf_image_name, sparql_endpoint)
-    olu.fetch_change(6180233)
+    olu.fetch_change(6181927)
 
     # o2c = Osm2RdfConnector("/Users/nicolasvontrott/Documents/Masterproject/osm2rdf/osm2rdf")
     # o2c.convert(b'')
