@@ -1,5 +1,6 @@
 from SPARQLWrapper import SPARQLWrapper, XML, POST
 from Constants import PREFIXES
+import urllib.error
 
 
 class SparqlConnector:
@@ -10,6 +11,17 @@ class SparqlConnector:
         self.sparql.setReturnFormat(XML)
         self.sparql.setMethod(POST)
         self.sparql.setCredentials("demo", "demo")
+
+        try:
+            self.sparql.setQuery("""
+                    DELETE { ?s ?p ?o } WHERE {
+                        rdf:TEST_TEST_TEST ?p ?o .
+                    }
+                    """
+            )
+            self.sparql.query()
+        except urllib.error.URLError:
+            raise SparqlException("Could not connect to SPARQL endpoint")
 
     def delete_subject(self, subject: str) -> None:
         """
@@ -42,3 +54,7 @@ INSERT DATA {{
         )
         self.sparql.queryType = "DELETE"
         self.sparql.query()
+
+
+class SparqlException(Exception):
+    pass
