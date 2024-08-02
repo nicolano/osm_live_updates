@@ -317,18 +317,13 @@ class OsmLiveUpdates:
 
 def main() -> None:
     logging.getLogger().setLevel(logging.INFO)
-    sparql_endpoint = "http://Nicolass-MBP.fritz.box:7200/repositories/osm-test/statements"
-    osm2rdf_path = "/Users/nicolasvontrott/Documents/Masterproject/osm2rdf/osm2rdf"
-    osm2rdf_image_name = "nicolano/osm2rdf"
+    sparql_endpoint = ""
+    osm2rdf_path = ""
+    osm2rdf_image_name = ""
 
     olu = OsmLiveUpdates(osm2rdf_path, osm2rdf_image_name, sparql_endpoint)
     olu.fetch_change(6181927)
 
-    # o2c = Osm2RdfConnector("/Users/nicolasvontrott/Documents/Masterproject/osm2rdf/osm2rdf")
-    # o2c.convert(b'')
-
-    # sc = SparqlConnector(sparql_endpoint)
-    # sc.delete_subject("athlete:JosephJosyStoffel")
 
 
 if __name__ == "__main__":
