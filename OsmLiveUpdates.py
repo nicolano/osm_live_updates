@@ -8,7 +8,7 @@ from xml.etree import ElementTree
 import time
 
 from Osm2RdfConnector import Osm2RdfConnector
-from SparqlConnector import SparqlConnector
+from SparqlConnector import SparqlConnector, OutputFormat
 from Constants import OSM_REPLICATION_BASE_URL, STATE_FILE_EXTENSION, CHANGE_FILE_EXTENSION, TEMPORARY_TAG, OSM_NODE_URL
 
 
@@ -16,9 +16,14 @@ class OsmLiveUpdates:
     osm2rdfConnector: Osm2RdfConnector
     sparqlConnector: SparqlConnector
 
-    def __init__(self, osm2rdf_path: str, osm2rdf_image_name: str, sparql_endpoint: str):
+    def __init__(
+            self,
+            osm2rdf_path: str,
+            osm2rdf_image_name: str,
+            sparql_endpoint: str,
+            output_format: OutputFormat = OutputFormat.SPARQL_ENDPOINT):
         self.osm2rdfConnector = Osm2RdfConnector(osm2rdf_path, osm2rdf_image_name)
-        self.sparqlConnector = SparqlConnector(sparql_endpoint)
+        self.sparqlConnector = SparqlConnector(sparql_endpoint, output_format)
 
     def fetch_change(self, from_sequence_number: int):
         logging.info(f"Starting fetch from sequence number {str(from_sequence_number)}")
@@ -320,10 +325,9 @@ def main() -> None:
     sparql_endpoint = ""
     osm2rdf_path = ""
     osm2rdf_image_name = ""
-
-    olu = OsmLiveUpdates(osm2rdf_path, osm2rdf_image_name, sparql_endpoint)
-    olu.fetch_change(6181927)
-
+    output_format = OutputFormat.FILE
+    olu = OsmLiveUpdates(osm2rdf_path, osm2rdf_image_name, sparql_endpoint, output_format)
+    olu.fetch_change(6181929)
 
 
 if __name__ == "__main__":

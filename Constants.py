@@ -8,6 +8,8 @@ TEMPORARY_TAG = "TEMPORARY"
 OSM_2_RDF_INPUT_FILE_NAME = "tmp.osm"
 OSM_2_RDF_OUTPUT_FILE_NAME = "tmp.osm.ttl.bz2"
 
+# SparqlConnector
+SPARQL_OUTPUT_FILE_NAME = "sparql_output.txt"
 PREFIXES = """
 PREFIX ohmnode: <https://www.openhistoricalmap.org/node/> 
 PREFIX osmrel: <https://www.openstreetmap.org/relation/> 
